@@ -5,47 +5,54 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 )
 
 type Polymerisation struct {
 	template string
+	polymer  map[string]int
 	rules    map[string]string
-	allRules string
-	elements []string
 }
 
 func main() {
 	p := readInput("input.txt")
-	p.growPolymer(40)
+	fmt.Println(p.growPolymer(40))
 }
 
 func (p *Polymerisation) growPolymer(steps int) int {
 	for range make([]struct{}, steps) {
-		p.template = p.pairInsertion(p.template, "")
+		p.pairInsertion(p.polymer)
 	}
-	max := strings.Count(p.template, p.elements[0])
-	min := strings.Count(p.template, p.elements[0])
-	for _, el := range p.elements {
-		num := strings.Count(p.template, el)
-		if num > max {
-			max = num
-		} else if num < min {
-			min = num
-		}
-	}
-	fmt.Println(max - min)
-	return max - min
+	counts := p.countElements()
+	return counts[len(counts)-1] - counts[0]
 }
 
-func (p *Polymerisation) pairInsertion(s string, new string) string {
-	if len(s) == 2 && strings.Contains(p.allRules, s) {
-		new += p.rules[s]
-	}else if strings.Contains(p.allRules, s[:2]) {
-		new += p.rules[s[:2]][:2]
-		return p.pairInsertion(s[1:], new)
+func (p *Polymerisation) pairInsertion(template map[string]int) {
+	new := map[string]int{}
+	for k, v := range template {
+		second := p.rules[k]
+		new[string(k[0])+second] += v
+		new[second+string(k[1])] += v
 	}
-	return new
+	p.polymer = new
+}
+
+func (p *Polymerisation) countElements() []int {
+	elements := map[string]int{}
+	//double counting all elements
+	elements[string(p.template[0])]++
+	elements[string(p.template[len(p.template)-1])]++
+	for k, v := range p.polymer {
+		elements[string(k[0])] += v
+		elements[string(k[1])] += v
+	}
+	counts := []int{}
+	for _, v := range elements {
+		counts = append(counts, v/2)
+	}
+	sort.Ints(counts)
+	return counts
 }
 
 func readInput(fname string) Polymerisation {
@@ -57,27 +64,21 @@ func readInput(fname string) Polymerisation {
 
 	scanner := bufio.NewScanner(file)
 	p := Polymerisation{}
-	p.rules = make(map[string]string)
+	p.rules, p.polymer = make(map[string]string), make(map[string]int)
 	start := true
 	for scanner.Scan() {
 		if start {
 			p.template = scanner.Text()
+			for i := 1; i < len(p.template); i++ {
+				p.polymer[p.template[i-1:i+1]]++
+			}
 			start = false
 		} else if scanner.Text() == "" {
 			continue
 		} else {
 			rule := strings.Split(scanner.Text(), " -> ")
-			temp := ""
-			for i, r := range rule[0] {
-				if i == 1 {
-					temp += rule[1]
-				}
-				temp += string(r)
-			}
-			p.rules[rule[0]] = temp
-			p.allRules += fmt.Sprintf("%s, ", rule[0])
+			p.rules[rule[0]] = rule[1]
 		}
 	}
-	p.elements = []string{"B", "C", "H", "N"}
 	return p
 }
