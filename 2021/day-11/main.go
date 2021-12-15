@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/advent-of-code/2021/utils"
+	"../utils"
 )
 
 type Mat struct {
@@ -87,8 +87,8 @@ func (m *Mat) incrementByOne() {
 
 func (m *Mat) incrementAdjacent(row, col int) [][]int {
 	rowLimit, colLimit := len(m.Elements)-1, len(m.Elements[0])-1
-	for x := utils.minMaxofInts(0, row-1, utils.MIN); x <= utils.minMaxofInts(row+1, rowLimit, utils.MAX); x++ {
-		for y := utils.minMaxofInts(0, col-1, utils.MIN); y <= utils.minMaxofInts(col+1, colLimit, utils.MAX); y++ {
+	for x := utils.MinMaxofInts(0, row-1, utils.MAX); x <= utils.MinMaxofInts(row+1, rowLimit, utils.MIN); x++ {
+		for y := utils.MinMaxofInts(0, col-1, utils.MAX); y <= utils.MinMaxofInts(col+1, colLimit, utils.MIN); y++ {
 			//if adjacent cell is already flashing, do not increment further
 			if (x != row || y != col) && m.Elements[x][y] != 0 {
 				m.Elements[x][y] = (m.Elements[x][y] + 1) % 10

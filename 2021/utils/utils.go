@@ -5,7 +5,7 @@ const(
 	MAX = false
 )
 
-func minMaxofInts(a int, b int, min bool) int {
+func MinMaxofInts(a int, b int, min bool) int {
 	if min {
 		if b < a {
 			return b
