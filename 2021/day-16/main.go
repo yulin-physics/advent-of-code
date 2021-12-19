@@ -9,14 +9,14 @@ import (
 	"strings"
 )
 
-type Message struct {
-	RawHex      string
-	Binary      string
-	HexToBinary map[string]string
-	Packets     []Packet
-	VersionSum  int
-	Length      int
-}
+// type Message struct {
+// 	RawHex      string
+// 	Binary      string
+// 	HexToBinary map[string]string
+// 	Packets     []Packet
+// 	VersionSum  int
+// 	Length      int
+// }
 
 //type id = 4: literal value packet, encodes a binary number, len % 4 ==0
 //type id != 4: operator packet
@@ -30,112 +30,101 @@ type Packet struct {
 }
 
 func main() {
-	m := readInput("test.txt")
-	m.DecodeBinary()
+	b := readInput("test.txt")
+	p := DecodeBinary(b)
+	fmt.Println(p.VersionSum())
+
 }
 
 func (p *Packet) VersionSum() int {
 	var sum int
-	for _, p := range p.SubPackets {
+	for {
 		sum += p.Version
+		if p.SubPackets == nil {
+			break
+		}
+		p = &p.SubPackets[0]
 	}
 	return sum
 }
 
-func (m *Message) DecodeBinary() []Packet {
-	fmt.Println("start", m.Binary)
-	if len(strings.TrimLeft(m.Binary, "0")) == 0 {
-		return m.Packets
-	}
-	if strings.HasPrefix(m.Binary, "0000") {
-		fmt.Println("why", m.Binary)
-		m.Binary = m.Binary[4:]
-		fmt.Println("why", m.Binary)
-	}
-	packet := Packet{}
-	packet.Version, packet.TypeId, m.Binary = m.bitsToDec(m.Binary[:3]), m.bitsToDec(m.Binary[3:6]), m.Binary[6:]
-	m.VersionSum += packet.Version
-	if packet.TypeId == 4 {
-		packet.Number = m.decodeLiteralPacket()
+func DecodeBinary(binary string) Packet {
+	p := Packet{}
+	fmt.Println(binary)
+	p.Version, p.TypeId, binary = p.bitsToDec(binary[:3]), p.bitsToDec(binary[3:6]), binary[6:]
+	if p.TypeId == 4 {
+		p.Number = p.decodeLiteralPacket(binary)
 	} else {
-		lengthTypeId := m.bitsToDec(m.Binary[0:1])
-		m.Binary = m.Binary[1:]
-		packet.Number = m.decodeOperatorPacket(lengthTypeId)
+		p.LengthTypeId = p.bitsToDec(binary[0:1])
+		binary = binary[1:]
+		p.decodeOperatorPacket(binary)
 	}
-	m.Packets = append(m.Packets, packet)
-
-	fmt.Println("---", m.VersionSum, packet.Version)
-	return m.DecodeBinary()
-
+	return p
 }
 
-func (m *Message) decodeOperatorPacket(lengthTypeId int) int {
-	number := ""
-	if lengthTypeId == 0 {
-		fmt.Println("here", m.Binary)
-		length := m.bitsToDec(m.Binary[:15])
-		m.Binary = m.Binary[15:]
+func (p *Packet) decodeOperatorPacket(binary string)[]Packet {
+	if p.LengthTypeId == 0 {
+		length := p.bitsToDec(binary[:15])
+		binary = binary[15:]
 		for {
 			if length-11 < 0 {
-				number += m.Binary[:length]
-				m.Binary = m.Binary[(m.Length-(len(m.Binary)-length))%4+length:]
-				m.Length = len(m.Binary)
 				break
 			}
-			fmt.Println(m.Binary, length)
-			number += m.Binary[:11]
-			m.Binary = m.Binary[11:]
+			subPacket := DecodeBinary(binary)
+			p.SubPackets = append(p.SubPackets, subPacket)
+			p.Length += subPacket.Length
+			binary = binary[subPacket.Length:]
 			length -= 11
 		}
-	} else if lengthTypeId == 1 {
-		num := m.bitsToDec(m.Binary[:11])
-		fmt.Println("now", num)
-		m.Binary = m.Binary[11:]
-		for {
-			if num == 0 {
-				m.Binary = m.Binary[(m.Length-len(m.Binary))%4:]
-				m.Length = len(m.Binary)
-				break
-			}
-			number += m.Binary[:11]
-			m.Binary = m.Binary[11:]
-			num -= 1
+	} else if p.LengthTypeId == 1 {
+		num := p.bitsToDec(binary[:11])
+		binary = binary[11:]
+		for range make([]struct{}, num) {
+			subPacket := DecodeBinary(binary)
+			p.Length += subPacket.Length
+			p.SubPackets = append(p.SubPackets, subPacket)
+			binary = binary[subPacket.Length:]
 		}
 	}
-	fmt.Println("here", m.Binary)
-	return m.bitsToDec(number)
+	return nil
 }
 
-func (m *Message) decodeLiteralPacket() int {
+func (p *Packet) decodeLiteralPacket(binary string) int {
 	number := ""
 	for {
-		number += m.Binary[1:5]
-		m.Binary = m.Binary[5:]
-		if m.Binary[0:1] == "0" {
-			// number += m.Binary[1:5]
-			// m.Binary = m.Binary[(m.Length-(len(m.Binary)-5))%4+5:]
-			// m.Length = len(m.Binary)
+		groupBits := binary[:5]
+		number += groupBits[1:]
+		binary = binary[5:]
+		p.Length += 5
+		if strings.HasPrefix(groupBits, "0") {
 			break
 		}
 	}
-	return m.bitsToDec(number)
+	num, err := strconv.ParseInt(number, 2, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return int(num)
 }
 
-func (m *Message) bitsToDec(bits string) int {
+func (p *Packet) bitsToDec(bits string) int {
 	dec, err := strconv.ParseInt(bits, 2, 64)
+	p.Length += len(bits)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return int(dec)
 }
 
-func (m *Message) hexToBits() {
-	for _, r := range m.RawHex {
-		m.Binary += m.HexToBinary[string(r)]
+func hexToBits(rawHex string, hexToBinary map[string]string) string {
+	binary := ""
+	for _, r := range rawHex {
+		binary += hexToBinary[string(r)]
 	}
+	return binary
 }
 
-func readInput(fname string) Message {
+func readInput(fname string) string {
 	file, err := os.Open(fname)
 	if err != nil {
 		log.Fatal(err)
@@ -143,21 +132,20 @@ func readInput(fname string) Message {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	m := Message{}
-	m.HexToBinary = make(map[string]string)
+	rawHex := ""
+	hexToBinary := make(map[string]string)
 	first := true
 	for scanner.Scan() {
 		if first {
-			m.RawHex = scanner.Text()
+			rawHex = scanner.Text()
 			first = false
 		} else if scanner.Text() == "" {
 			continue
 		} else {
 			row := strings.Split(scanner.Text(), " = ")
-			m.HexToBinary[row[0]] = row[1]
+			hexToBinary[row[0]] = row[1]
 		}
 	}
-	m.hexToBits()
-	m.Length = len(m.Binary)
-	return m
+	binary := hexToBits(rawHex, hexToBinary)
+	return binary
 }
