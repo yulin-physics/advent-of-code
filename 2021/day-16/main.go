@@ -30,7 +30,7 @@ type Packet struct {
 }
 
 func main() {
-	b := readInput("test.txt")
+	b := readInput("input.txt")
 	p := DecodeBinary(b)
 	fmt.Println(p.VersionSum())
 
@@ -38,19 +38,17 @@ func main() {
 
 func (p *Packet) VersionSum() int {
 	var sum int
-	for {
-		sum += p.Version
-		if p.SubPackets == nil {
-			break
-		}
-		p = &p.SubPackets[0]
+	for _, sub := range p.SubPackets {
+		 sum += sub.VersionSum()
 	}
-	return sum
+	return sum + p.Version 
 }
 
 func DecodeBinary(binary string) Packet {
 	p := Packet{}
-	fmt.Println(binary)
+	if strings.TrimLeft(binary, "0") ==""{
+		return p
+	}
 	p.Version, p.TypeId, binary = p.bitsToDec(binary[:3]), p.bitsToDec(binary[3:6]), binary[6:]
 	if p.TypeId == 4 {
 		p.Number = p.decodeLiteralPacket(binary)
