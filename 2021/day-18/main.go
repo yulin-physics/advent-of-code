@@ -11,27 +11,18 @@ import (
 )
 
 type Node struct {
-	Value   int
-	Left    *Node
-	Right   *Node
-	Level   int
-	Visited bool
+	Value               int
+	Left, Right, Parent *Node
+	Level               int
+	Visited             bool
 }
 
 func main() {
 	roots := readInput("test.txt")
 	reduce(roots)
-	// n := reduce(roots)
-
-	// for _, n := range roots {
-	// 	ok, node := n.canExplode()
-	// 	if ok {
-	// 		n.pairExplosion(node, n)
-	// 	}
-	// 	fmt.Println(n)
-	// }
-	// fmt.Println("afterrrrr", n)
-	// fmt.Println(n.magnitude())
+	n := reduce(roots)
+	fmt.Println("afterrrrr", n)
+	fmt.Println(n.magnitude())
 }
 
 func reduce(roots []*Node) *Node {
@@ -41,36 +32,18 @@ func reduce(roots []*Node) *Node {
 	for _, tree := range roots[1:] {
 		final = final.add(tree)
 		final.updateLevel(0)
-		fmt.Println("----", final)
-		// for {
-		ok, pair := final.canExplode()
-		if ok {
-			final.pairExplosion(pair, final)
+		for {
+			okExplode, pair := final.canExplode()
+			if okExplode {
+				final.pairExplosion(pair, final, final)
+				continue
+			}
+			okSplit := final.split()
+			if !okExplode && !okSplit{
+				break
+			}
 		}
-		//
-		fmt.Println("**", final)
-		ok, pair = final.canExplode()
-		if ok {
-			final.pairExplosion(pair, final)
-		}
-		//
-		fmt.Println("**", final)
-		final.split()
-		fmt.Println("**", final)
-
 	}
-
-	// for {
-	// 	// if final.canExplode() {
-	// 	// 	final.pairExplosion()
-	// 	// }
-	// 	// if !final.canExplode() && !final.split(final) {
-	// 	// 	break
-	// 	// } else {
-	// 	// 	final.split(final)
-	// 	// }
-
-	// }
 
 	return final
 }
@@ -111,52 +84,35 @@ func (n *Node) split() bool {
 	}
 	left := n.Left.split()
 	if !left {
-		return n.Right.split()
+		left = n.Right.split()
 	}
 	return left
 }
 
-func (n *Node) checkRegNumLeft(pair *Node) {
-	if n.Right.Value >= 0 {
-		fmt.Println("000000000", n.Right)
-		n.Right.Value += pair.Left.Value
-		return
-	}
-	n.Left.checkRegNumLeft(pair)
-}
-
-func (n *Node) checkRegNumRight(pair *Node) {
-	if n.Left.Value >= 0 {
-		n.Left.Value += pair.Right.Value
-		return
-	}
-	n.Right.checkRegNumRight(pair)
-}
-
-func (n *Node) pairExplosion(pair *Node, parent *Node) bool {
+func (n *Node) pairExplosion(pair *Node, parent *Node, previous *Node)  {
 	if n == nil {
-		return false
+		fmt.Println(n, "here")
+		return 
 	}
-	if n.Level == 3 && n.Value == -1 {
-		if reflect.DeepEqual(n.Right, pair) {
-			parent.checkRegNumLeft(pair)
-			n.Left.Value += pair.Left.Value
-			n.Right.Value = 0
-			n.Right.Left, n.Right.Right = nil, nil
-			return true
-		} else if reflect.DeepEqual(n.Left, pair) {
-			parent.checkRegNumRight(pair)
-			n.Right.Value += pair.Right.Value
-			n.Left.Value = 0
-			n.Left.Left, n.Left.Right = nil, nil
-			return true
+	if reflect.DeepEqual(n.Right, pair) {
+		if previous.Right.Value > 0 {
+			previous.Right.Value += pair.Right.Value
 		}
+		n.Left.Value += pair.Left.Value
+		n.Right.Value = 0
+		n.Right.Left, n.Right.Right = nil, nil
+		return
+	} else if reflect.DeepEqual(n.Left, pair) {
+		if previous.Left.Value > 0 {
+			previous.Left.Value += pair.Left.Value
+		}
+		n.Right.Value += pair.Right.Value
+		n.Left.Value = 0
+		n.Left.Left, n.Left.Right = nil, nil
+		return 
 	}
-	left := n.Left.pairExplosion(pair, parent)
-	if !left {
-		return n.Right.pairExplosion(pair, parent)
-	}
-	return left
+	n.Left.pairExplosion(pair, parent, n)
+	n.Right.pairExplosion(pair, parent, n)
 }
 
 func (n *Node) canExplode() (bool, *Node) {
@@ -168,15 +124,9 @@ func (n *Node) canExplode() (bool, *Node) {
 	if !ok && n.Right != nil {
 		ok, found = n.Right.canExplode()
 	}
-
 	if n.Level == 4 && n.Value == -1 {
 		return true, n
 	}
-	// ok, left := n.Left.canExplode()
-	// if ok {
-	// 	return true, left
-	// }
-	// return n.Right.canExplode()
 	return ok, found
 }
 
